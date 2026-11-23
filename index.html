@@ -1,0 +1,1239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#060B14" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="icon.svg" />
+  <title>Zoya Personal AI</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background-color: #060B14;
+      color: #E6F4FF;
+      margin: 0;
+      padding: 0;
+      overscroll-behavior-y: contain;
+    }
+    @keyframes pulseSlow {
+      0%, 100% { transform: scale(0.92); opacity: 0.75; }
+      50% { transform: scale(1.08); opacity: 1; }
+    }
+    @keyframes pulseFast {
+      0%, 100% { transform: scale(0.88); opacity: 0.8; }
+      50% { transform: scale(1.16); opacity: 1; }
+    }
+    @keyframes spinSlow {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes sosFlash {
+      0%, 100% { background-color: rgba(220, 38, 38, 0.15); }
+      50% { background-color: rgba(220, 38, 38, 0.45); }
+    }
+    .orb-idle { animation: pulseSlow 2.6s ease-in-out infinite; }
+    .orb-active { animation: pulseFast 0.85s ease-in-out infinite; }
+    .ring-spin { animation: spinSlow 10s linear infinite; }
+    .sos-flash { animation: sosFlash 0.6s ease-in-out infinite; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col bg-[#060B14] text-[#E6F4FF] selection:bg-cyan-500/30">
+
+  <!-- PIN Lock Overlay -->
+  <div id="pinLockOverlay" class="fixed inset-0 z-50 hidden bg-[#060B14]/98 backdrop-blur-md flex flex-col items-center justify-center p-6">
+    <div class="w-16 h-16 rounded-full bg-cyan-500/15 border border-cyan-400/40 flex items-center justify-center mb-4">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-cyan-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+      </svg>
+    </div>
+    <h2 class="text-lg font-bold text-white">Zoya Security Lock</h2>
+    <p class="text-xs text-slate-400 mt-1 mb-4">Apna 4-digit PIN daalein</p>
+    <input id="pinUnlockInput" type="password" inputmode="numeric" maxlength="6" placeholder="••••" class="w-44 text-center tracking-[0.5em] text-lg bg-[#0E1726] border border-cyan-500/40 rounded-xl px-4 py-2.5 text-white focus:outline-none focus:border-cyan-300" />
+    <p id="pinErrorMsg" class="text-xs text-rose-400 mt-2 hidden">Galat PIN! Dubara try karein.</p>
+    <button id="pinUnlockBtn" type="button" class="mt-4 w-44 py-2.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-[#00141A] font-bold text-sm">Unlock Zoya</button>
+  </div>
+
+  <!-- SOS Active Banner -->
+  <div id="sosBanner" class="hidden fixed inset-x-0 top-0 z-40 sos-flash border-b border-rose-500 px-4 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <span class="w-3 h-3 rounded-full bg-rose-500 animate-ping"></span>
+      <span class="text-xs font-bold text-rose-200">SOS EMERGENCY ACTIVE — Tap Stop to silence</span>
+    </div>
+    <button id="stopSosBtn" type="button" class="px-3 py-1 rounded-lg bg-rose-600 text-white text-xs font-bold">STOP SOS</button>
+  </div>
+
+  <!-- Top Header -->
+  <header class="sticky top-0 z-20 bg-[#0A1220]/90 backdrop-blur border-b border-cyan-500/20 px-4 py-2.5 flex items-center justify-between">
+    <div class="flex items-center gap-2.5">
+      <div id="headerDot" class="w-2.5 h-2.5 rounded-full bg-cyan-400 shadow-[0_0_10px_#00E5FF]"></div>
+      <div>
+        <h1 id="headerTitle" class="text-sm font-bold tracking-wide text-cyan-300 leading-tight">ZOYA AI</h1>
+        <p id="moodBadge" class="text-[10px] text-slate-400 leading-tight">Mood: Cheerful</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-2">
+      <span id="timerBadge" class="hidden text-[11px] font-semibold px-2 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/40"></span>
+      <span id="modeBadge" class="text-[11px] font-medium px-2.5 py-1 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">Offline</span>
+      <button id="openSettingsHeaderBtn" type="button" aria-label="Settings" class="p-1.5 rounded-lg bg-[#132035] border border-cyan-500/25 text-slate-300 hover:text-cyan-300">
+        <span class="sr-only">Settings</span><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Toast Banner -->
+  <div id="toast" class="fixed top-14 left-1/2 -translate-x-1/2 z-50 hidden px-4 py-2 rounded-xl bg-[#132035] border border-cyan-400/40 text-xs font-medium text-cyan-200 shadow-lg"></div>
+
+  <!-- Main Content -->
+  <main class="flex-1 flex flex-col max-w-2xl w-full mx-auto overflow-hidden">
+
+    <!-- TAB 1: ZOYA HUD -->
+    <section id="tab-hud" class="flex-1 flex flex-col px-4 pt-2 pb-2 overflow-hidden">
+      <!-- Zoya Arc Orb -->
+      <div class="flex flex-col items-center justify-center py-1.5 shrink-0">
+        <button id="orbBtn" type="button" aria-label="Tap to Speak" class="relative w-24 h-24 rounded-full flex items-center justify-center focus:outline-none">
+          <div id="orbGlow" class="absolute inset-0 rounded-full bg-cyan-400/20 blur-md orb-idle transition-colors duration-300"></div>
+          <div id="orbRingOuter" class="absolute inset-1 rounded-full border-2 border-dashed border-cyan-400/60 ring-spin"></div>
+          <div id="orbRingInner" class="absolute inset-3 rounded-full border border-cyan-300/40 bg-[#0E1726]/90 flex items-center justify-center shadow-[0_0_24px_rgba(0,229,255,0.25)]">
+            <svg id="orbMicIcon" xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-cyan-300 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z" />
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 10v2a7 7 0 01-14 0v-2M12 19v4M8 23h8" />
+            </svg>
+          </div>
+        </button>
+        <p id="orbStatus" class="mt-1.5 text-xs font-medium text-cyan-300 text-center">Zoya Online • Bolne ke liye Orb dabayein</p>
+      </div>
+
+      <!-- Quick Command Chips -->
+      <div id="quickChips" class="flex gap-2 overflow-x-auto no-scrollbar py-1.5 shrink-0">
+        <button type="button" data-cmd="Call Mom" class="chip-btn shrink-0 px-3 py-1.5 rounded-full bg-[#132035] hover:bg-[#1A2D4A] border border-cyan-500/25 text-xs text-slate-200 transition">Call Mom</button>
+        <button type="button" data-cmd="Search Artificial Intelligence" class="chip-btn shrink-0 px-3 py-1.5 rounded-full bg-[#132035] hover:bg-[#1A2D4A] border border-cyan-500/25 text-xs text-slate-200 transition">Web Search</button>
+        <button type="button" data-cmd="Time" class="chip-btn shrink-0 px-3 py-1.5 rounded-full bg-[#132035] hover:bg-[#1A2D4A] border border-cyan-500/25 text-xs text-slate-200 transition">Time</button>
+        <button type="button" data-cmd="Battery" class="chip-btn shrink-0 px-3 py-1.5 rounded-full bg-[#132035] hover:bg-[#1A2D4A] border border-cyan-500/25 text-xs text-slate-200 transition">Battery</button>
+        <button type="button" data-cmd="Set timer 1 minute" class="chip-btn shrink-0 px-3 py-1.5 rounded-full bg-[#132035] hover:bg-[#1A2D4A] border border-cyan-500/25 text-xs text-slate-200 transition">1 Min Timer</button>
+        <button type="button" data-cmd="I feel stressed" class="chip-btn shrink-0 px-3 py-1.5 rounded-full bg-[#132035] hover:bg-[#1A2D4A] border border-purple-500/30 text-xs text-purple-200 transition">Feeling Low</button>
+        <button type="button" data-cmd="Open YouTube" class="chip-btn shrink-0 px-3 py-1.5 rounded-full bg-[#132035] hover:bg-[#1A2D4A] border border-cyan-500/25 text-xs text-slate-200 transition">Open YouTube</button>
+        <button type="button" data-cmd="Good morning" class="chip-btn shrink-0 px-3 py-1.5 rounded-full bg-[#132035] hover:bg-[#1A2D4A] border border-cyan-500/25 text-xs text-slate-200 transition">Good Morning</button>
+      </div>
+
+      <!-- Chat Feed -->
+      <div id="chatFeed" class="flex-1 overflow-y-auto space-y-3 py-2 pr-1 min-h-[190px]"></div>
+
+      <!-- Input Bar -->
+      <form id="commandForm" class="pt-2 pb-1 flex items-center gap-2 shrink-0">
+        <input id="commandInput" type="text" autocomplete="off" placeholder="Bolein ya likhein (Call Mom, Search..., SOS)..." class="flex-1 bg-[#0E1726] border border-[#1E3250] focus:border-cyan-400 rounded-full px-4 py-2.5 text-sm text-white placeholder-slate-400 focus:outline-none" />
+        <button type="submit" id="sendBtn" aria-label="Send Command" class="w-11 h-11 rounded-full bg-cyan-400 hover:bg-cyan-300 text-[#00141A] flex items-center justify-center shrink-0 transition shadow-[0_0_14px_rgba(0,229,255,0.35)]">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z" />
+          </svg>
+        </button>
+      </form>
+    </section>
+
+    <!-- TAB 2: SMART CONTACTS -->
+    <section id="tab-contacts" class="hidden flex-1 flex-col px-4 py-4 overflow-y-auto">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h2 class="text-lg font-bold text-white">Smart Calling Contacts</h2>
+          <p class="text-xs text-slate-400">"Call Mom" ya "WhatsApp Rahul" bolkar turant connect karein.</p>
+        </div>
+        <button id="openContactModalBtn" type="button" class="px-3.5 py-2 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-[#00141A] text-xs font-bold">+ Add</button>
+      </div>
+      <div id="contactsList" class="space-y-2.5"></div>
+    </section>
+
+    <!-- TAB 3: ROUTINES -->
+    <section id="tab-routines" class="hidden flex-1 flex-col px-4 py-4 overflow-y-auto">
+      <div class="flex items-center justify-between mb-3">
+        <div>
+          <h2 class="text-lg font-bold text-white">Custom Commands &amp; Routines</h2>
+          <p class="text-xs text-slate-400">Ek voice trigger se multiple actions chalayein.</p>
+        </div>
+        <button id="openRoutineModalBtn" type="button" class="px-3.5 py-2 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-[#00141A] text-xs font-bold">+ Add</button>
+      </div>
+      <div id="routinesList" class="space-y-3"></div>
+    </section>
+
+    <!-- TAB 4: SECURITY ASSISTANT -->
+    <section id="tab-security" class="hidden flex-1 flex-col px-4 py-4 overflow-y-auto space-y-4">
+      <h2 class="text-lg font-bold text-white">Zoya Security Assistant</h2>
+
+      <!-- SOS Panic Card -->
+      <div class="bg-rose-950/30 border border-rose-500/40 rounded-2xl p-4 space-y-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-sm font-bold text-rose-200">Emergency SOS Mode</h3>
+            <p class="text-xs text-rose-300/80">Siren bajayein aur emergency helplines par turant call karein.</p>
+          </div>
+          <button id="triggerSosBtn" type="button" class="px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold shadow-lg">SOS ALERT</button>
+        </div>
+        <div class="grid grid-cols-3 gap-2 pt-1">
+          <a href="tel:112" class="text-center py-2 rounded-xl bg-[#0E1726] border border-rose-500/30 text-xs font-semibold text-rose-200">Call 112</a>
+          <a href="tel:100" class="text-center py-2 rounded-xl bg-[#0E1726] border border-rose-500/30 text-xs font-semibold text-rose-200">Police 100</a>
+          <a href="tel:108" class="text-center py-2 rounded-xl bg-[#0E1726] border border-rose-500/30 text-xs font-semibold text-rose-200">Ambulance 108</a>
+        </div>
+      </div>
+
+      <!-- Scam / Phishing Link Checker -->
+      <div class="bg-[#0E1726] border border-[#1A2B45] rounded-2xl p-4 space-y-2.5">
+        <h3 class="text-sm font-bold text-cyan-300">Suspicious Link / Scam Checker</h3>
+        <p class="text-xs text-slate-400">Koi bhi anjaan link check karein ki woh safe hai ya risky.</p>
+        <div class="flex gap-2">
+          <input id="linkCheckInput" type="url" placeholder="https://example.com..." class="flex-1 bg-[#060B14] border border-[#1E3250] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400" />
+          <button id="linkCheckBtn" type="button" class="px-3.5 py-2 rounded-xl bg-cyan-400 text-[#00141A] text-xs font-bold">Scan</button>
+        </div>
+        <p id="linkCheckResult" class="text-xs hidden rounded-xl p-2.5"></p>
+      </div>
+
+      <!-- App PIN Lock -->
+      <div class="bg-[#0E1726] border border-[#1A2B45] rounded-2xl p-4 space-y-2.5">
+        <h3 class="text-sm font-bold text-white">App Privacy PIN Lock</h3>
+        <p class="text-xs text-slate-400">Zoya open karne ke liye 4-digit PIN set karein (khali chhodne par lock hat jayega).</p>
+        <div class="flex gap-2">
+          <input id="setPinInput" type="password" inputmode="numeric" maxlength="6" placeholder="4-digit PIN (e.g. 1234)" class="flex-1 bg-[#060B14] border border-[#1E3250] rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-400" />
+          <button id="savePinBtn" type="button" class="px-3.5 py-2 rounded-xl bg-cyan-400 text-[#00141A] text-xs font-bold">Set PIN</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: SETTINGS -->
+    <section id="tab-settings" class="hidden flex-1 flex-col px-4 py-4 overflow-y-auto space-y-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-bold text-white">Zoya Core Settings</h2>
+        <button id="backToHudBtn" type="button" class="text-xs text-cyan-300 font-semibold">Back to Zoya</button>
+      </div>
+
+      <div class="space-y-3 bg-[#0E1726] border border-[#1A2B45] rounded-2xl p-4">
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1" for="setAssistantName">Assistant Name</label>
+          <input id="setAssistantName" type="text" class="w-full bg-[#060B14] border border-[#1E3250] rounded-xl px-3 py-2 text-sm text-white focus:border-cyan-400 focus:outline-none" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1" for="setUserName">Your Name (e.g. Boss)</label>
+          <input id="setUserName" type="text" class="w-full bg-[#060B14] border border-[#1E3250] rounded-xl px-3 py-2 text-sm text-white focus:border-cyan-400 focus:outline-none" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1" for="setProvider">Smart AI Provider</label>
+          <select id="setProvider" class="w-full bg-[#060B14] border border-[#1E3250] rounded-xl px-3 py-2 text-sm text-white focus:border-cyan-400 focus:outline-none">
+            <option value="GEMINI">Google Gemini (gemini-2.5-flash)</option>
+            <option value="OPENAI">OpenAI (gpt-4o-mini)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1" for="setApiKey">API Key (Advance AI Brain)</label>
+          <input id="setApiKey" type="password" placeholder="Paste Gemini or OpenAI API key..." class="w-full bg-[#060B14] border border-[#1E3250] rounded-xl px-3 py-2 text-sm text-white focus:border-cyan-400 focus:outline-none" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-slate-300 mb-1" for="setLang">Voice Language</label>
+          <select id="setLang" class="w-full bg-[#060B14] border border-[#1E3250] rounded-xl px-3 py-2 text-sm text-white focus:border-cyan-400 focus:outline-none">
+            <option value="en-IN">Hinglish (Hindi + English Mix)</option>
+            <option value="hi-IN">Shuddh Hindi (hi-IN)</option>
+          </select>
+        </div>
+        <div class="flex items-center justify-between pt-1">
+          <div>
+            <p class="text-sm font-medium text-white">Speak Responses Aloud (TTS)</p>
+            <p class="text-xs text-slate-400">Zoya Hinglish / Hindi mein bolkar jawab degi</p>
+          </div>
+          <input id="setAutoSpeak" type="checkbox" class="w-5 h-5 accent-cyan-400 cursor-pointer" />
+        </div>
+      </div>
+
+      <button id="saveSettingsBtn" type="button" class="w-full py-3 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-[#00141A] font-bold text-sm transition">Save Settings</button>
+      <button id="clearChatBtn" type="button" class="w-full py-2.5 rounded-xl bg-[#132035] border border-slate-700 text-slate-300 text-xs font-medium">Clear Conversation Memory</button>
+    </section>
+
+  </main>
+
+  <!-- Bottom Navigation (4 Clean Tabs) -->
+  <nav class="sticky bottom-0 z-20 bg-[#0E1726] border-t border-cyan-500/20 flex justify-around py-2">
+    <button type="button" data-tab="hud" class="nav-btn flex flex-col items-center gap-0.5 text-cyan-300 text-xs font-semibold px-3 py-1">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+      <span>Zoya</span>
+    </button>
+    <button type="button" data-tab="contacts" class="nav-btn flex flex-col items-center gap-0.5 text-slate-400 text-xs font-medium px-3 py-1">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+      <span>Contacts</span>
+    </button>
+    <button type="button" data-tab="routines" class="nav-btn flex flex-col items-center gap-0.5 text-slate-400 text-xs font-medium px-3 py-1">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h10"/></svg>
+      <span>Routines</span>
+    </button>
+    <button type="button" data-tab="security" class="nav-btn flex flex-col items-center gap-0.5 text-slate-400 text-xs font-medium px-3 py-1">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+      <span>Security</span>
+    </button>
+  </nav>
+
+  <!-- Add Routine Modal -->
+  <div id="routineModal" class="fixed inset-0 z-50 hidden bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-[#0E1726] border border-cyan-500/30 rounded-2xl w-full max-w-md p-5 space-y-3">
+      <h3 class="text-base font-bold text-white">New Custom Routine</h3>
+      <input id="rTitle" type="text" placeholder="Routine Name (e.g. Study Mode)" class="w-full bg-[#060B14] border border-[#1E3250] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-400" />
+      <input id="rTrigger" type="text" placeholder="Voice Trigger (e.g. study time)" class="w-full bg-[#060B14] border border-[#1E3250] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-400" />
+      <input id="rActions" type="text" value="time, set timer 25 minutes" placeholder="Comma-separated commands" class="w-full bg-[#060B14] border border-[#1E3250] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-400" />
+      <input id="rReply" type="text" value="Study mode started Boss! 25 minute focus timer on hai." placeholder="Zoya Spoken Reply" class="w-full bg-[#060B14] border border-[#1E3250] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-400" />
+      <div class="flex justify-end gap-2 pt-2">
+        <button id="cancelRoutineBtn" type="button" class="px-4 py-2 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800">Cancel</button>
+        <button id="saveRoutineBtn" type="button" class="px-4 py-2 rounded-xl text-xs font-bold bg-cyan-400 text-[#00141A] hover:bg-cyan-300">Save Routine</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Contact Modal -->
+  <div id="contactModal" class="fixed inset-0 z-50 hidden bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-[#0E1726] border border-cyan-500/30 rounded-2xl w-full max-w-md p-5 space-y-3">
+      <h3 class="text-base font-bold text-white">Add Smart Contact</h3>
+      <input id="cName" type="text" placeholder="Name (e.g. Mom, Rahul)" class="w-full bg-[#060B14] border border-[#1E3250] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-400" />
+      <input id="cPhone" type="tel" placeholder="Phone Number (e.g. +919876543210)" class="w-full bg-[#060B14] border border-[#1E3250] rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-cyan-400" />
+      <label class="flex items-center gap-2 text-xs text-slate-300">
+        <input id="cEmergency" type="checkbox" class="accent-rose-500" />
+        <span>Mark as Emergency SOS Contact</span>
+      </label>
+      <div class="flex justify-end gap-2 pt-2">
+        <button id="cancelContactBtn" type="button" class="px-4 py-2 rounded-xl text-xs font-medium text-slate-300 hover:bg-slate-800">Cancel</button>
+        <button id="saveContactBtn" type="button" class="px-4 py-2 rounded-xl text-xs font-bold bg-cyan-400 text-[#00141A] hover:bg-cyan-300">Save Contact</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const STORAGE_SETTINGS = 'zoya_web_settings_v2';
+      const STORAGE_ROUTINES = 'zoya_web_routines_v2';
+      const STORAGE_CONTACTS = 'zoya_web_contacts_v2';
+      const STORAGE_PIN = 'zoya_web_pin_v2';
+
+      const defaultSettings = {
+        assistantName: 'Zoya',
+        userName: 'Boss',
+        provider: 'GEMINI',
+        apiKey: '',
+        languageCode: 'en-IN',
+        autoSpeak: true
+      };
+
+      const defaultRoutines = [
+        {
+          id: 'r_morning',
+          title: 'Morning Briefing',
+          triggerPhrase: 'good morning',
+          actions: ['time', 'battery'],
+          spokenResponse: 'Good morning Boss! Aaj ka din shubh ho. Main aapki har madad ke liye ready hoon.'
+        },
+        {
+          id: 'r_focus',
+          title: '25 Min Focus',
+          triggerPhrase: 'focus mode',
+          actions: ['set timer 25 minutes'],
+          spokenResponse: 'Focus mode active Boss. 25 minute ka timer start ho gaya hai.'
+        }
+      ];
+
+      const defaultContacts = [
+        { id: 'c_1', name: 'Mom', phone: '112', isEmergency: true },
+        { id: 'c_2', name: 'Emergency Helpline', phone: '112', isEmergency: true }
+      ];
+
+      function safeRead(key, fallback) {
+        try {
+          const raw = localStorage.getItem(key);
+          return raw ? JSON.parse(raw) : fallback;
+        } catch (e) {
+          return fallback;
+        }
+      }
+
+      function safeWrite(key, val) {
+        try {
+          localStorage.setItem(key, JSON.stringify(val));
+        } catch (e) {}
+      }
+
+      let settings = Object.assign({}, defaultSettings, safeRead(STORAGE_SETTINGS, {}));
+      let routines = safeRead(STORAGE_ROUTINES, defaultRoutines);
+      let contacts = safeRead(STORAGE_CONTACTS, defaultContacts);
+      let savedPin = safeRead(STORAGE_PIN, '');
+      let chatHistory = []; // Advance AI Brain memory
+      let state = 'IDLE'; // IDLE, LISTENING, THINKING, SPEAKING
+      let zoyaMood = 'Cheerful';
+      let recognition = null;
+      let timerInterval = null;
+      let timerRemaining = 0;
+      let sosInterval = null;
+      let wakeLockSentinel = null;
+
+      const chatFeed = document.getElementById('chatFeed');
+      const orbBtn = document.getElementById('orbBtn');
+      const orbGlow = document.getElementById('orbGlow');
+      const orbRingOuter = document.getElementById('orbRingOuter');
+      const orbMicIcon = document.getElementById('orbMicIcon');
+      const orbStatus = document.getElementById('orbStatus');
+      const headerTitle = document.getElementById('headerTitle');
+      const moodBadge = document.getElementById('moodBadge');
+      const modeBadge = document.getElementById('modeBadge');
+      const timerBadge = document.getElementById('timerBadge');
+      const commandForm = document.getElementById('commandForm');
+      const commandInput = document.getElementById('commandInput');
+      const toastEl = document.getElementById('toast');
+
+      function showToast(msg) {
+        toastEl.textContent = msg;
+        toastEl.classList.remove('hidden');
+        setTimeout(() => toastEl.classList.add('hidden'), 2600);
+      }
+
+      function setMood(mood) {
+        zoyaMood = mood;
+        moodBadge.textContent = `Mood: ${mood}`;
+        if (state === 'IDLE') setOrbState('IDLE');
+      }
+
+      function setOrbState(newState, customLabel) {
+        state = newState;
+        orbGlow.className = 'absolute inset-0 rounded-full blur-md transition-colors duration-300 ';
+        orbRingOuter.className = 'absolute inset-1 rounded-full border-2 border-dashed ring-spin ';
+        if (state === 'LISTENING') {
+          orbGlow.className += 'bg-amber-400/35 orb-active';
+          orbRingOuter.className += 'border-amber-400';
+          orbMicIcon.setAttribute('class', 'w-7 h-7 text-amber-300');
+          orbStatus.textContent = customLabel || 'Listening... Boliye';
+        } else if (state === 'THINKING') {
+          orbGlow.className += 'bg-blue-500/35 orb-active';
+          orbRingOuter.className += 'border-blue-400';
+          orbMicIcon.setAttribute('class', 'w-7 h-7 text-blue-300');
+          orbStatus.textContent = 'Soch rahi hoon...';
+        } else if (state === 'SPEAKING') {
+          orbGlow.className += 'bg-emerald-400/35 orb-active';
+          orbRingOuter.className += 'border-emerald-400';
+          orbMicIcon.setAttribute('class', 'w-7 h-7 text-emerald-300');
+          orbStatus.textContent = 'Speaking... (Tap to stop)';
+        } else {
+          const moodColors = {
+            Caring: ['bg-purple-400/25 orb-idle', 'border-purple-400/60', 'w-7 h-7 text-purple-300'],
+            Alert: ['bg-rose-500/30 orb-active', 'border-rose-400/70', 'w-7 h-7 text-rose-300'],
+            Cheerful: ['bg-cyan-400/20 orb-idle', 'border-cyan-400/60', 'w-7 h-7 text-cyan-300']
+          };
+          const mc = moodColors[zoyaMood] || moodColors.Cheerful;
+          orbGlow.className += mc[0];
+          orbRingOuter.className += mc[1];
+          orbMicIcon.setAttribute('class', mc[2]);
+          orbStatus.textContent = `${settings.assistantName} Online • Tap Orb to Speak`;
+        }
+      }
+
+      function addMessage(text, isUser, badge, actionLinkUrl, actionLinkLabel) {
+        const wrapper = document.createElement('div');
+        wrapper.className = `flex flex-col ${isUser ? 'items-end' : 'items-start'}`;
+        const bubble = document.createElement('div');
+        bubble.className = isUser
+          ? 'max-w-[85%] rounded-2xl rounded-tr-sm px-3.5 py-2.5 bg-blue-600/30 border border-blue-400/30 text-sm text-white'
+          : 'max-w-[88%] rounded-2xl rounded-tl-sm px-3.5 py-2.5 bg-[#132035] border border-cyan-500/20 text-sm text-slate-100';
+
+        if (!isUser && badge) {
+          const b = document.createElement('div');
+          b.className = 'text-[10px] font-bold uppercase tracking-wider text-cyan-300 mb-1';
+          b.textContent = badge;
+          bubble.appendChild(b);
+        }
+        const p = document.createElement('p');
+        p.className = 'whitespace-pre-wrap leading-relaxed';
+        p.textContent = text;
+        bubble.appendChild(p);
+
+        if (actionLinkUrl) {
+          const a = document.createElement('a');
+          a.href = actionLinkUrl;
+          a.target = '_blank';
+          a.rel = 'noopener';
+          a.className = 'inline-block mt-2 px-3 py-1 rounded-lg bg-cyan-400/20 border border-cyan-400/40 text-xs font-semibold text-cyan-200 hover:bg-cyan-400/30';
+          a.textContent = actionLinkLabel || 'Open Link';
+          bubble.appendChild(a);
+        }
+
+        if (!isUser) {
+          const speakBtn = document.createElement('button');
+          speakBtn.type = 'button';
+          speakBtn.className = 'mt-2 inline-flex items-center gap-1 text-[11px] text-cyan-300/80 hover:text-cyan-200';
+          speakBtn.textContent = '🔊 Suno';
+          speakBtn.addEventListener('click', () => {
+            unlockSpeech();
+            speakText(text, true);
+          });
+          bubble.appendChild(speakBtn);
+        }
+
+        wrapper.appendChild(bubble);
+        chatFeed.appendChild(wrapper);
+        chatFeed.scrollTop = chatFeed.scrollHeight;
+      }
+
+      function playTone(freq, dur) {
+        try {
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(freq, ctx.currentTime);
+          gain.gain.setValueAtTime(0.25, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + dur);
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + dur);
+        } catch (e) {}
+      }
+
+      function triggerSos() {
+        setMood('Alert');
+        document.getElementById('sosBanner').classList.remove('hidden');
+        if (navigator.vibrate) navigator.vibrate([300, 150, 300, 150, 500]);
+        if (sosInterval) clearInterval(sosInterval);
+        playTone(960, 0.35);
+        sosInterval = setInterval(() => playTone(960, 0.35), 750);
+        const emerg = contacts.find(c => c.isEmergency);
+        const msg = emerg
+          ? `SOS Emergency active! ${emerg.name} (${emerg.phone}) ya 112 par call karne ke liye Security tab use karein.`
+          : 'SOS Emergency active! Police 100 ya 112 par call karein.';
+        addMessage(msg, false, 'SOS Security', 'tel:112', 'Call 112 Now');
+        speakText(msg);
+      }
+
+      function stopSos() {
+        if (sosInterval) {
+          clearInterval(sosInterval);
+          sosInterval = null;
+        }
+        document.getElementById('sosBanner').classList.add('hidden');
+        setMood('Cheerful');
+        showToast('SOS Alert stopped.');
+      }
+
+      let availableVoices = [];
+      let speechUnlocked = false;
+      function loadVoices() {
+        if ('speechSynthesis' in window) {
+          availableVoices = window.speechSynthesis.getVoices() || [];
+        }
+      }
+      loadVoices();
+      if ('speechSynthesis' in window && 'onvoiceschanged' in window.speechSynthesis) {
+        window.speechSynthesis.onvoiceschanged = loadVoices;
+      }
+
+      function unlockSpeech() {
+        if (speechUnlocked || !('speechSynthesis' in window)) return;
+        try {
+          loadVoices();
+          const u = new SpeechSynthesisUtterance(' ');
+          u.volume = 0;
+          u.rate = 10;
+          window.speechSynthesis.speak(u);
+          speechUnlocked = true;
+        } catch (e) {}
+      }
+
+      function pickVoice(langCode) {
+        if (!availableVoices.length) loadVoices();
+        const pref = (langCode || 'en-IN').toLowerCase();
+        return availableVoices.find(v => v.lang.toLowerCase() === pref)
+          || availableVoices.find(v => v.lang.toLowerCase().startsWith('hi'))
+          || availableVoices.find(v => v.lang.toLowerCase().startsWith('en-in'))
+          || availableVoices.find(v => v.lang.toLowerCase().startsWith('en'))
+          || availableVoices[0]
+          || null;
+      }
+
+      function speakText(text, forceSpeak) {
+        if ((!settings.autoSpeak && !forceSpeak) || !('speechSynthesis' in window)) {
+          setOrbState('IDLE');
+          return;
+        }
+        try {
+          window.speechSynthesis.cancel();
+          const clean = text
+            .replace(/\[ACTION:[^\]]+\]/gi, '')
+            .replace(/\[EMOTION:[^\]]+\]/gi, '')
+            .replace(/[*_`#]/g, '')
+            .trim();
+          if (!clean) { setOrbState('IDLE'); return; }
+
+          const chunks = clean.match(/[^.!?।\n]+[.!?।]?/g) || [clean];
+          const merged = [];
+          let buf = '';
+          for (const c of chunks) {
+            if ((buf + ' ' + c).trim().length > 170 && buf) {
+              merged.push(buf.trim());
+              buf = c;
+            } else {
+              buf = (buf + ' ' + c).trim();
+            }
+          }
+          if (buf.trim()) merged.push(buf.trim());
+
+          const voice = pickVoice(settings.languageCode);
+          setTimeout(() => {
+            try {
+              window.speechSynthesis.resume();
+              merged.forEach((part, idx) => {
+                const utter = new SpeechSynthesisUtterance(part);
+                if (voice) utter.voice = voice;
+                utter.lang = voice ? voice.lang : (settings.languageCode || 'en-IN');
+                utter.rate = 1.02;
+                utter.pitch = 1.04;
+                utter.volume = 1;
+                if (idx === 0) utter.onstart = () => setOrbState('SPEAKING');
+                if (idx === merged.length - 1) {
+                  utter.onend = () => setOrbState('IDLE');
+                  utter.onerror = () => setOrbState('IDLE');
+                }
+                window.speechSynthesis.speak(utter);
+              });
+            } catch (err) {
+              setOrbState('IDLE');
+            }
+          }, 75);
+        } catch (e) {
+          setOrbState('IDLE');
+        }
+      }
+
+      function startTimer(seconds) {
+        if (timerInterval) clearInterval(timerInterval);
+        timerRemaining = Math.max(1, seconds);
+        timerBadge.classList.remove('hidden');
+        const updateBadge = () => {
+          const m = Math.floor(timerRemaining / 60);
+          const s = timerRemaining % 60;
+          timerBadge.textContent = `Timer ${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        };
+        updateBadge();
+        timerInterval = setInterval(() => {
+          timerRemaining -= 1;
+          if (timerRemaining <= 0) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+            timerBadge.classList.add('hidden');
+            playTone(880, 0.5);
+            if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+            const doneMsg = 'Boss, aapka timer complete ho gaya hai!';
+            addMessage(doneMsg, false, 'Timer Done');
+            speakText(doneMsg);
+          } else {
+            updateBadge();
+          }
+        }, 1000);
+      }
+
+      function detectEmotionAndFriendlyReply(lower) {
+        if (/(sad|udaas|dukhi|lonely|akela|cry|rona|hurt|depressed)/.test(lower)) {
+          setMood('Caring');
+          return {
+            matched: true,
+            reply: `Hey ${settings.userName}, main hoon na aapke saath! Kabhi bhi akela mat samajhna. Agar baat karni ho ya koi achha music sunna ho toh batayein, main yahin hoon.`,
+            badge: 'Zoya Caring'
+          };
+        }
+        if (/(stress|tension|tired|thak|angry|gussa|frustrated|worried|pareshan)/.test(lower)) {
+          setMood('Caring');
+          return {
+            matched: true,
+            reply: `Deep breath lein ${settings.userName}. Sab theek ho jayega! Chahein toh 2 minute ka break lein, main timer laga deti hoon ya aapke liye kuch relax karne wala play karti hoon.`,
+            badge: 'Zoya Support'
+          };
+        }
+        if (/(happy|khush|mazaa|awesome|love you|thank|shukriya|best|great)/.test(lower)) {
+          setMood('Cheerful');
+          return {
+            matched: true,
+            reply: `Yay! Yeh sunkar mujhe bahut khushi hui ${settings.userName}! Aap hamesha aise hi muskurate rahein. Boliye ab kya kaam karna hai?`,
+            badge: 'Zoya Cheerful'
+          };
+        }
+        if (/(kaise ho|how are you|kya haal|hello|hi |namaste|hey zoya)/.test(lower)) {
+          setMood('Cheerful');
+          return {
+            matched: true,
+            reply: `Namaste ${settings.userName}! Main bilkul mast aur energetic hoon! Aap kaise hain? Aaj kya plan hai?`,
+            badge: 'Friendly Chat'
+          };
+        }
+        return { matched: false };
+      }
+
+      function findContact(query) {
+        const q = query.toLowerCase().trim();
+        return contacts.find(c => c.name.toLowerCase() === q || c.name.toLowerCase().includes(q) || q.includes(c.name.toLowerCase()));
+      }
+
+      function analyzeUrlSafety(urlStr) {
+        const u = urlStr.trim();
+        const issues = [];
+        if (u.startsWith('http://')) issues.push('HTTPS nahi hai (unencrypted)');
+        if (/https?:\/\/\d{1,3}(\.\d{1,3}){3}/.test(u)) issues.push('Direct IP address link (risky)');
+        if (u.includes('@')) issues.push('URL mein "@" redirect trick hai');
+        if (/\.(tk|ml|ga|cf|gq|xyz|top)(\/|$)/i.test(u)) issues.push('High-risk domain extension');
+        if ((u.match(/\./g) || []).length >= 4) issues.push('Bahut zyada subdomains (phishing pattern)');
+        return issues;
+      }
+
+      async function wikiAndWebSearch(query) {
+        const cleanQ = query.trim();
+        const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(cleanQ)}`;
+        try {
+          const wikiUrl = `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(cleanQ.replace(/\s+/g, '_'))}`;
+          const res = await fetch(wikiUrl);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.extract) {
+              return {
+                reply: `${data.extract}`,
+                badge: `Web Search: ${data.title}`,
+                linkUrl: googleUrl,
+                linkLabel: 'More on Google'
+              };
+            }
+          }
+        } catch (e) {}
+        return {
+          reply: `"${cleanQ}" ke liye Google search ready hai.`,
+          badge: 'Internet Search',
+          linkUrl: googleUrl,
+          linkLabel: `Search "${cleanQ}" on Google`
+        };
+      }
+
+      async function tryLocalCommand(raw) {
+        const lower = raw.toLowerCase().trim();
+
+        // SOS Security
+        if (lower === 'sos' || lower.includes('help me') || lower.includes('bachao') || lower.includes('emergency')) {
+          triggerSos();
+          return { handled: true, skipAdd: true };
+        }
+
+        // Security Link Check
+        if (lower.startsWith('check link ') || lower.startsWith('scan ')) {
+          const target = raw.replace(/^(check link|scan)\s+/i, '').trim();
+          const issues = analyzeUrlSafety(target);
+          const msg = issues.length === 0
+            ? `Link "${target}" basic checks mein safe lag raha hai (HTTPS & normal domain).`
+            : `Savdhaan! Is link mein yeh risk mila: ${issues.join(', ')}.`;
+          return { handled: true, reply: msg, badge: 'Security Scan' };
+        }
+
+        // Smart Calling (Contacts + Direct Number)
+        if (lower.startsWith('call ') || lower.includes(' ko call') || lower.includes('call lagao')) {
+          const target = raw
+            .replace(/^(call)\s+/i, '')
+            .replace(/\s+ko\s+call.*/i, '')
+            .replace(/call\s+lagao\s*/i, '')
+            .trim();
+          const matched = findContact(target);
+          const phone = matched ? matched.phone : target.replace(/[^0-9+]/g, '');
+          if (phone.length >= 3) {
+            return {
+              handled: true,
+              reply: `${matched ? matched.name : phone} ko call karne ke liye neeche button dabayein.`,
+              badge: 'Smart Calling',
+              linkUrl: `tel:${phone}`,
+              linkLabel: `Call ${matched ? matched.name : phone}`
+            };
+          }
+          return { handled: true, reply: `'${target}' Contacts mein nahi mila. Contacts tab mein number save karein ya seedha number bolein.`, badge: 'Smart Calling' };
+        }
+
+        // WhatsApp Smart Contact
+        if (lower.startsWith('whatsapp ')) {
+          const target = raw.replace(/^whatsapp\s+(to\s+)?/i, '').trim();
+          const matched = findContact(target);
+          const phone = (matched ? matched.phone : target).replace(/[^0-9]/g, '');
+          const waUrl = phone ? `https://wa.me/${phone}` : 'https://wa.me/';
+          return {
+            handled: true,
+            reply: `${matched ? matched.name : target} ke liye WhatsApp ready hai.`,
+            badge: 'WhatsApp',
+            linkUrl: waUrl,
+            linkLabel: 'Open WhatsApp'
+          };
+        }
+
+        // Internet Search (Wikipedia + Google)
+        if (lower.startsWith('search ') || lower.startsWith('google ') || lower.startsWith('wiki ') || lower.startsWith('kya hai ')) {
+          const q = raw.replace(/^(search|google|wiki|kya hai)\s+(for\s+)?/i, '').trim();
+          const sr = await wikiAndWebSearch(q);
+          return { handled: true, reply: sr.reply, badge: sr.badge, linkUrl: sr.linkUrl, linkLabel: sr.linkLabel };
+        }
+
+        // Phone Controls: Time, Battery, Timer, Vibrate, WakeLock
+        if (lower.includes('time') || lower.includes('samay') || lower.includes('kitne baje') || lower.includes('date')) {
+          const now = new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' });
+          return { handled: true, reply: `Abhi samay hai ${now}.`, badge: 'Phone Control' };
+        }
+
+        if (lower.includes('battery')) {
+          if (navigator.getBattery) {
+            try {
+              const bat = await navigator.getBattery();
+              const pct = Math.round(bat.level * 100);
+              const chg = bat.charging ? 'charge ho rahi hai' : 'charging par nahi hai';
+              return { handled: true, reply: `Phone ki battery ${pct}% hai aur ${chg}.`, badge: `Battery ${pct}%` };
+            } catch (e) {}
+          }
+          return { handled: true, reply: 'Browser battery level read nahi kar pa raha hai.', badge: 'Battery' };
+        }
+
+        if (lower.includes('vibrate')) {
+          if (navigator.vibrate) {
+            navigator.vibrate([200, 100, 200]);
+            return { handled: true, reply: 'Phone vibrate kar diya hai.', badge: 'Phone Control' };
+          }
+          return { handled: true, reply: 'Is browser mein vibration supported nahi hai.', badge: 'Phone Control' };
+        }
+
+        if (lower.includes('wake') || lower.includes('screen on')) {
+          if (navigator.wakeLock) {
+            try {
+              wakeLockSentinel = await navigator.wakeLock.request('screen');
+              return { handled: true, reply: 'Screen Wake Lock ON kar diya hai — screen off nahi hogi.', badge: 'Wake Lock ON' };
+            } catch (e) {}
+          }
+          return { handled: true, reply: 'Screen Wake Lock permission browser ne block ki hai.', badge: 'Phone Control' };
+        }
+
+        if (lower.includes('timer')) {
+          const m = lower.match(/(\d+)/);
+          const num = m ? parseInt(m[1], 10) : 60;
+          const sec = (lower.includes('min') || lower.includes('minute')) ? num * 60 : num;
+          startTimer(sec);
+          return { handled: true, reply: `${sec} seconds ka timer start kar diya hai.`, badge: `Timer ${sec}s` };
+        }
+
+        if (lower.startsWith('open ') || lower.endsWith(' kholo') || lower.endsWith(' chalao')) {
+          const app = raw.replace(/^(open|launch)\s+/i, '').replace(/\s+(kholo|chalao)$/i, '').trim().toLowerCase();
+          const urlMap = {
+            youtube: 'https://m.youtube.com',
+            google: 'https://www.google.com',
+            whatsapp: 'https://wa.me/',
+            instagram: 'https://www.instagram.com',
+            maps: 'https://maps.google.com',
+            gmail: 'https://mail.google.com',
+            spotify: 'https://open.spotify.com'
+          };
+          const targetUrl = urlMap[app] || `https://www.google.com/search?q=${encodeURIComponent(app)}`;
+          return { handled: true, reply: `${app} open karne ke liye tap karein.`, badge: `Open ${app}`, linkUrl: targetUrl, linkLabel: `Open ${app}` };
+        }
+
+        if (/^[0-9+\-*/().\s]+$/.test(lower) && /[+\-*/]/.test(lower)) {
+          try {
+            const ans = Function(`"use strict"; return (${lower})`)();
+            return { handled: true, reply: `Iska jawab hai ${ans}.`, badge: 'Calculator' };
+          } catch (e) {}
+        }
+
+        // Friendly Emotion Engine
+        const emo = detectEmotionAndFriendlyReply(lower);
+        if (emo.matched && !settings.apiKey) {
+          return { handled: true, reply: emo.reply, badge: emo.badge };
+        }
+
+        return { handled: false };
+      }
+
+      async function callCloudAi(prompt) {
+        const sysPrompt = `You are ${settings.assistantName}, a warm, caring, emotionally intelligent personal AI friend for ${settings.userName}.
+Always reply naturally in Hinglish or Hindi (matching the user's Hinglish/Hindi style) in 2-4 warm, crisp sentences. Remember previous context.
+If the user feels sad/stressed, be extra caring and supportive.
+Optionally append ONE tag at the end if needed:
+- [EMOTION:Cheerful] or [EMOTION:Caring] or [EMOTION:Alert]
+- [ACTION:CALL|NameOrNumber]
+- [ACTION:SEARCH|Query]
+- [ACTION:TIMER|Seconds]
+- [ACTION:SOS]`;
+
+        const recentHistory = chatHistory.slice(-8);
+
+        if (settings.provider === 'GEMINI') {
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(settings.apiKey)}`;
+          const contents = recentHistory.map(m => ({
+            role: m.isUser ? 'user' : 'model',
+            parts: [{ text: m.text }]
+          }));
+          const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: sysPrompt }] },
+              contents
+            })
+          });
+          if (!res.ok) throw new Error(`Gemini API ${res.status}`);
+          const data = await res.json();
+          return data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || 'No response.';
+        } else {
+          const messages = [{ role: 'system', content: sysPrompt }].concat(
+            recentHistory.map(m => ({ role: m.isUser ? 'user' : 'assistant', content: m.text }))
+          );
+          const res = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${settings.apiKey}`
+            },
+            body: JSON.stringify({
+              model: 'gpt-4o-mini',
+              messages,
+              temperature: 0.7
+            })
+          });
+          if (!res.ok) throw new Error(`OpenAI API ${res.status}`);
+          const data = await res.json();
+          return data.choices?.[0]?.message?.content?.trim() || 'No response.';
+        }
+      }
+
+      async function handleCommand(rawText) {
+        const text = rawText.trim();
+        if (!text) return;
+        addMessage(text, true);
+        chatHistory.push({ isUser: true, text });
+        setOrbState('THINKING');
+
+        // 1. Custom Routines
+        const lower = text.toLowerCase();
+        const routine = routines.find(r => lower === r.triggerPhrase.toLowerCase() || lower.includes(r.triggerPhrase.toLowerCase()));
+        if (routine) {
+          for (const act of routine.actions) {
+            await tryLocalCommand(act);
+          }
+          addMessage(routine.spokenResponse, false, `Routine: ${routine.title}`);
+          chatHistory.push({ isUser: false, text: routine.spokenResponse });
+          speakText(routine.spokenResponse);
+          return;
+        }
+
+        // 2. Local Intents
+        const local = await tryLocalCommand(text);
+        if (local.handled) {
+          if (!local.skipAdd) {
+            addMessage(local.reply, false, local.badge, local.linkUrl, local.linkLabel);
+            chatHistory.push({ isUser: false, text: local.reply });
+            speakText(local.reply);
+          }
+          return;
+        }
+
+        // 3. Advance AI Brain (or Smart Fallback)
+        if (!settings.apiKey) {
+          const fallback = await wikiAndWebSearch(text);
+          const msg = `Offline mode mein hoon, par maine "${text}" ke liye web search ready kar diya hai. Full AI chat ke liye Settings mein API key daalein.`;
+          addMessage(fallback.reply.includes('Google search ready') ? msg : fallback.reply, false, fallback.badge, fallback.linkUrl, fallback.linkLabel);
+          speakText(msg);
+          return;
+        }
+
+        try {
+          const aiRaw = await callCloudAi(text);
+          const emoMatch = aiRaw.match(/\[EMOTION:([^\]]+)\]/i);
+          if (emoMatch) setMood(emoMatch[1].trim());
+
+          let linkUrl = null;
+          let linkLabel = null;
+          const actMatch = aiRaw.match(/\[ACTION:([^\]]+)\]/i);
+          if (actMatch) {
+            const parts = actMatch[1].split('|');
+            const actType = (parts[0] || '').toUpperCase();
+            if (actType === 'SOS') triggerSos();
+            if (actType === 'TIMER') startTimer(parseInt(parts[1], 10) || 60);
+            if (actType === 'SEARCH') {
+              const q = parts[1] || text;
+              linkUrl = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+              linkLabel = `Search "${q}"`;
+            }
+            if (actType === 'CALL') {
+              const target = parts[1] || '';
+              const matched = findContact(target);
+              const ph = matched ? matched.phone : target.replace(/[^0-9+]/g, '');
+              if (ph) {
+                linkUrl = `tel:${ph}`;
+                linkLabel = `Call ${matched ? matched.name : ph}`;
+              }
+            }
+          }
+
+          const cleanReply = aiRaw.replace(/\[ACTION:[^\]]+\]/gi, '').replace(/\[EMOTION:[^\]]+\]/gi, '').trim();
+          addMessage(cleanReply, false, settings.provider === 'GEMINI' ? 'Zoya Brain (Gemini)' : 'Zoya Brain (OpenAI)', linkUrl, linkLabel);
+          chatHistory.push({ isUser: false, text: cleanReply });
+          speakText(cleanReply);
+        } catch (err) {
+          addMessage(`AI connect nahi ho paya (${err.message}). API key check karein.`, false, 'API Error');
+          setOrbState('IDLE');
+        }
+      }
+
+      function toggleVoice() {
+        if (state === 'SPEAKING') {
+          if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+          setOrbState('IDLE');
+          return;
+        }
+        if (state === 'LISTENING' && recognition) {
+          recognition.stop();
+          setOrbState('IDLE');
+          return;
+        }
+        const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (!SpeechRec) {
+          showToast('Voice Recognition browser mein supported nahi hai. Neeche type karein.');
+          return;
+        }
+        try {
+          if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+          recognition = new SpeechRec();
+          recognition.lang = settings.languageCode || 'en-IN';
+          recognition.interimResults = true;
+          recognition.onstart = () => setOrbState('LISTENING');
+          recognition.onresult = (event) => {
+            const result = event.results[event.results.length - 1];
+            const transcript = result[0].transcript;
+            if (result.isFinal) {
+              setOrbState('IDLE');
+              handleCommand(transcript);
+            } else {
+              orbStatus.textContent = transcript;
+            }
+          };
+          recognition.onerror = () => { setOrbState('IDLE'); showToast('Mic permission check karein.'); };
+          recognition.onend = () => { if (state === 'LISTENING') setOrbState('IDLE'); };
+          recognition.start();
+        } catch (e) {
+          setOrbState('IDLE');
+        }
+      }
+
+      function renderContacts() {
+        const el = document.getElementById('contactsList');
+        el.innerHTML = '';
+        contacts.forEach(c => {
+          const card = document.createElement('div');
+          card.className = 'bg-[#0E1726] border border-[#1A2B45] rounded-2xl p-3.5 flex items-center justify-between gap-2';
+          card.innerHTML = `
+            <div class="min-w-0">
+              <p class="text-sm font-bold text-white truncate">${c.name} ${c.isEmergency ? '<span class="text-[10px] text-rose-400 font-semibold ml-1">SOS</span>' : ''}</p>
+              <p class="text-xs text-slate-400">${c.phone}</p>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <a href="tel:${c.phone}" class="px-3 py-1.5 rounded-lg bg-emerald-500/20 text-emerald-300 text-xs font-semibold">Call</a>
+              <a href="https://wa.me/${c.phone.replace(/[^0-9]/g, '')}" target="_blank" rel="noopener" class="px-2.5 py-1.5 rounded-lg bg-cyan-500/20 text-cyan-300 text-xs font-semibold">WA</a>
+              <button type="button" data-del-c="${c.id}" class="px-2 py-1.5 rounded-lg bg-rose-500/15 text-rose-300 text-xs">Del</button>
+            </div>
+          `;
+          el.appendChild(card);
+        });
+        el.querySelectorAll('[data-del-c]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const id = btn.getAttribute('data-del-c');
+            contacts = contacts.filter(x => x.id !== id);
+            safeWrite(STORAGE_CONTACTS, contacts);
+            renderContacts();
+          });
+        });
+      }
+
+      function renderRoutines() {
+        const container = document.getElementById('routinesList');
+        container.innerHTML = '';
+        routines.forEach(r => {
+          const card = document.createElement('div');
+          card.className = 'bg-[#0E1726] border border-[#1A2B45] rounded-2xl p-3.5 flex items-center justify-between gap-3';
+          card.innerHTML = `
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-bold text-white truncate">${r.title}</p>
+              <p class="text-xs text-cyan-300 mt-0.5">Trigger: "${r.triggerPhrase}"</p>
+              <p class="text-xs text-slate-400 mt-1 truncate">Actions: ${r.actions.join(' → ')}</p>
+            </div>
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button type="button" data-run="${r.id}" class="px-3 py-1.5 rounded-lg bg-cyan-400/20 text-cyan-300 text-xs font-semibold">Run</button>
+              <button type="button" data-del="${r.id}" class="px-2.5 py-1.5 rounded-lg bg-red-500/15 text-red-300 text-xs">Del</button>
+            </div>
+          `;
+          container.appendChild(card);
+        });
+        container.querySelectorAll('[data-run]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const found = routines.find(x => x.id === btn.getAttribute('data-run'));
+            if (found) { switchTab('hud'); handleCommand(found.triggerPhrase); }
+          });
+        });
+        container.querySelectorAll('[data-del]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            routines = routines.filter(x => x.id !== btn.getAttribute('data-del'));
+            safeWrite(STORAGE_ROUTINES, routines);
+            renderRoutines();
+          });
+        });
+      }
+
+      function syncSettingsUI() {
+        document.getElementById('setAssistantName').value = settings.assistantName;
+        document.getElementById('setUserName').value = settings.userName;
+        document.getElementById('setProvider').value = settings.provider;
+        document.getElementById('setApiKey').value = settings.apiKey;
+        document.getElementById('setLang').value = settings.languageCode;
+        document.getElementById('setAutoSpeak').checked = settings.autoSpeak;
+        document.getElementById('setPinInput').value = savedPin || '';
+        headerTitle.textContent = `${settings.assistantName.toUpperCase()} AI`;
+        modeBadge.textContent = settings.apiKey ? (settings.provider === 'GEMINI' ? 'Gemini AI' : 'OpenAI') : 'Offline';
+        if (state === 'IDLE') setOrbState('IDLE');
+      }
+
+      function switchTab(tabName) {
+        ['hud', 'contacts', 'routines', 'security', 'settings'].forEach(t => {
+          const sec = document.getElementById(`tab-${t}`);
+          if (t === tabName) {
+            sec.classList.remove('hidden');
+            sec.classList.add('flex');
+          } else {
+            sec.classList.add('hidden');
+            sec.classList.remove('flex');
+          }
+        });
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+          const active = btn.getAttribute('data-tab') === tabName;
+          btn.className = `nav-btn flex flex-col items-center gap-0.5 text-xs px-3 py-1 ${active ? 'text-cyan-300 font-semibold' : 'text-slate-400 font-medium'}`;
+        });
+      }
+
+      // Wire events
+      orbBtn.addEventListener('click', () => { unlockSpeech(); toggleVoice(); });
+      commandForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        unlockSpeech();
+        const val = commandInput.value;
+        if (val.trim()) { commandInput.value = ''; handleCommand(val); }
+      });
+      document.querySelectorAll('.chip-btn').forEach(btn => {
+        btn.addEventListener('click', () => { unlockSpeech(); handleCommand(btn.getAttribute('data-cmd')); });
+      });
+      document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.addEventListener('click', () => switchTab(btn.getAttribute('data-tab')));
+      });
+      document.getElementById('openSettingsHeaderBtn').addEventListener('click', () => switchTab('settings'));
+      document.getElementById('backToHudBtn').addEventListener('click', () => switchTab('hud'));
+      document.getElementById('triggerSosBtn').addEventListener('click', triggerSos);
+      document.getElementById('stopSosBtn').addEventListener('click', stopSos);
+
+      document.getElementById('linkCheckBtn').addEventListener('click', () => {
+        const url = document.getElementById('linkCheckInput').value.trim();
+        const resEl = document.getElementById('linkCheckResult');
+        if (!url) return;
+        const issues = analyzeUrlSafety(url);
+        resEl.classList.remove('hidden');
+        if (issues.length === 0) {
+          resEl.className = 'text-xs rounded-xl p-2.5 bg-emerald-500/15 text-emerald-300 border border-emerald-500/30';
+          resEl.textContent = 'Safe lag raha hai: HTTPS valid aur koi suspicious pattern nahi mila.';
+        } else {
+          resEl.className = 'text-xs rounded-xl p-2.5 bg-rose-500/15 text-rose-300 border border-rose-500/30';
+          resEl.textContent = `Risky Link Alert: ${issues.join(', ')}`;
+        }
+      });
+
+      document.getElementById('savePinBtn').addEventListener('click', () => {
+        savedPin = document.getElementById('setPinInput').value.trim();
+        safeWrite(STORAGE_PIN, savedPin);
+        showToast(savedPin ? 'Security PIN set ho gaya!' : 'PIN lock hata diya gaya.');
+      });
+
+      document.getElementById('pinUnlockBtn').addEventListener('click', () => {
+        const entered = document.getElementById('pinUnlockInput').value.trim();
+        if (entered === savedPin) {
+          document.getElementById('pinLockOverlay').classList.add('hidden');
+          document.getElementById('pinErrorMsg').classList.add('hidden');
+        } else {
+          document.getElementById('pinErrorMsg').classList.remove('hidden');
+        }
+      });
+
+      document.getElementById('saveSettingsBtn').addEventListener('click', () => {
+        settings = {
+          assistantName: document.getElementById('setAssistantName').value.trim() || 'Zoya',
+          userName: document.getElementById('setUserName').value.trim() || 'Boss',
+          provider: document.getElementById('setProvider').value,
+          apiKey: document.getElementById('setApiKey').value.trim(),
+          languageCode: document.getElementById('setLang').value,
+          autoSpeak: document.getElementById('setAutoSpeak').checked
+        };
+        safeWrite(STORAGE_SETTINGS, settings);
+        syncSettingsUI();
+        showToast('Settings save ho gayi!');
+      });
+
+      document.getElementById('clearChatBtn').addEventListener('click', () => {
+        chatHistory = [];
+        chatFeed.innerHTML = '';
+        addMessage(`Memory cleared! Main ${settings.assistantName} hoon — dubara shuru karein.`, false, 'System');
+        showToast('Chat memory cleared.');
+      });
+
+      // Modals
+      const rModal = document.getElementById('routineModal');
+      document.getElementById('openRoutineModalBtn').addEventListener('click', () => rModal.classList.remove('hidden'));
+      document.getElementById('cancelRoutineBtn').addEventListener('click', () => rModal.classList.add('hidden'));
+      document.getElementById('saveRoutineBtn').addEventListener('click', () => {
+        const title = document.getElementById('rTitle').value.trim();
+        const trigger = document.getElementById('rTrigger').value.trim();
+        const actionsRaw = document.getElementById('rActions').value;
+        const reply = document.getElementById('rReply').value.trim() || 'Routine executed.';
+        if (!title || !trigger) { showToast('Name aur Trigger zaroori hai.'); return; }
+        routines.push({ id: 'r_' + Date.now(), title, triggerPhrase: trigger, actions: actionsRaw.split(',').map(s => s.trim()).filter(Boolean), spokenResponse: reply });
+        safeWrite(STORAGE_ROUTINES, routines);
+        renderRoutines();
+        rModal.classList.add('hidden');
+        showToast('Routine saved!');
+      });
+
+      const cModal = document.getElementById('contactModal');
+      document.getElementById('openContactModalBtn').addEventListener('click', () => cModal.classList.remove('hidden'));
+      document.getElementById('cancelContactBtn').addEventListener('click', () => cModal.classList.add('hidden'));
+      document.getElementById('saveContactBtn').addEventListener('click', () => {
+        const name = document.getElementById('cName').value.trim();
+        const phone = document.getElementById('cPhone').value.trim();
+        const isEmergency = document.getElementById('cEmergency').checked;
+        if (!name || !phone) { showToast('Name aur Phone number daalein.'); return; }
+        contacts.push({ id: 'c_' + Date.now(), name, phone, isEmergency });
+        safeWrite(STORAGE_CONTACTS, contacts);
+        renderContacts();
+        cModal.classList.add('hidden');
+        document.getElementById('cName').value = '';
+        document.getElementById('cPhone').value = '';
+        showToast('Contact saved!');
+      });
+
+      // Init
+      if (savedPin) {
+        document.getElementById('pinLockOverlay').classList.remove('hidden');
+      }
+      syncSettingsUI();
+      renderContacts();
+      renderRoutines();
+      addMessage(
+        `Namaste ${settings.userName}! Main ${settings.assistantName} hoon — aapki friendly personal AI, Smart Calling, Internet Search aur Security Assistant ke saath. Boliye aaj kya madad karun?`,
+        false,
+        'Zoya Ready'
+      );
+    })();
+  </script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>

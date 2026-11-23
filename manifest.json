@@ -1,0 +1,17 @@
+{
+  "name": "Zoya Personal AI",
+  "short_name": "Zoya AI",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#060B14",
+  "theme_color": "#060B14",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
